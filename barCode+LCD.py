@@ -58,6 +58,7 @@ def buttonPressed():
 def keydown(e):
     global inp
     inp = inp + str(e.char)
+        
 def getProductName(barcode):
     for i in range(len(product_barcodes_names)):
         if(product_barcodes_names[i][0] == barcode):
@@ -206,29 +207,49 @@ def returnItemChecker():
     else:
         print('dont  return')
         notPurchasedLcdUpdate()
-
+def payment(cardInfo):
+    card_num = cardInfo[2:18]
+    lcd_henok.clear_all()
+    lcd_henok.lcd_display('   Processing', 1, 0)
+    lcd_henok.lcd_display('     Payment    ', 2, 0)
+    for i in range(16):
+        lcd_henok.lcd_display('.', 3, i)
+        time.sleep(.25)
+    for i in range(5):
+        lcd_henok.lcd_display('.', 4, i)
+        time.sleep(.25)
+    time.sleep(1)
+    lcd_henok.clear_all()
+    lcd_henok.lcd_display('    Payment    ', 1, 0)
+    lcd_henok.lcd_display('  Completed!', 2, 0)
+    lcd_henok.lcd_display('   Thank You!', 3, 0)
+    lcd_henok.lcd_display('---COME AGAIN---', 4, 0)
+    print(card_num)
     
-def returnKey(e):
+def returnKey(e):        
     global return_item
     global return_item_t
     global last_inp
     global inp
     last_inp = inp
     inp = ""
-    if(first_time_purchase and return_item):
-        notPurchasedLcdUpdate()
-        return_item = False
-        return_item_t = False
-    elif(return_item):
-        print('trying to return')
-        returnItemChecker()
-        return_item = False
-        return_item_t = False
-    else:
-        itemPurchased()
-        print(items_purchased)
-        print(items_purchased_quantity)
-        updateLcd()
+    if(last_inp[0] == '%'):
+        payment(last_inp)
+    else:        
+        if(first_time_purchase and return_item):
+            notPurchasedLcdUpdate()
+            return_item = False
+            return_item_t = False
+        elif(return_item):
+            print('trying to return')
+            returnItemChecker()
+            return_item = False
+            return_item_t = False
+        else:
+            itemPurchased()
+            print(items_purchased)
+            print(items_purchased_quantity)
+            updateLcd()
     
 root = Tk()
 root.title("Command Center")

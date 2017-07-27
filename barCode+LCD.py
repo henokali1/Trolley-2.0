@@ -1,18 +1,23 @@
 import lcd_henok
 import time
 import RPi.GPIO as GPIO
-import threading
+from Adafruit_Thermal import *
+
 try:
     from Tkinter import *
 except ImportError:
     from tkinter import *
 
+printer = Adafruit_Thermal("/dev/serial0", 19200, timeout=5)
+
 return_item = False
 return_item_t = False
 return_item_q = False
-
+bill_printed = False
 
 buttonPin = 17
+nameQty = 19
+qtyPrice = 6
 inp = ""
 last_inp = ""
 product_barcodes_names = [['0009458800010419', 'CLAMOX', 10.50],
@@ -36,23 +41,29 @@ first_time_purchase = True
 GPIO.setmode(GPIO.BCM)
 GPIO.setup(buttonPin, GPIO.IN, pull_up_down=GPIO.PUD_UP)
 
-def executeButtonThread():
-   while(1):
-       if(buttonPressed()):
-           global return_item
-           global return_item_t
-           return_item = True
-           return_item_t = True
-           time.sleep(1/10)
-       else:
-            time.sleep(1/10)
+def reset():
+    global items_purchased, items_purchased_quantity, total, first_time_price, first_time_quantity, first_time_total, first_time_purchase, return_item, return_item_t, return_item_q, bill_printed, inp, last_inp
+    
+    items_purchased = []
+    items_purchased_quantity = []
+    total = 0.0
+    first_time_price = True
+    first_time_quantity = True
+    first_time_total = True
+    first_time_purchase = True
+    return_item = False
+    return_item_t = False
+    return_item_q = False
+    bill_printed = False
+    inp = ""
+    last_inp = ""
 
-       
-def buttonPressed():
-    if(GPIO.input(buttonPin)):
-        return(False)
-    else:
-        return(True)    
+
+def buttonPressCallback(inp):
+    global return_item
+    global return_item_t
+    return_item = True
+    return_item_t = True  
 
 
 def keydown(e):
@@ -112,6 +123,7 @@ def updateQuantityOnLcd():
         displayAtTheEnd(str(items_purchased_quantity[ind]), 2)
         first_time_quantity = False
 def notPurchasedLcdUpdate():
+    global first_time_quantity
     lcd_henok.clear_all()
     lcd_henok.lcd_display('Unpercased Item', 1, 0)
     first_time_quantity = True
@@ -136,7 +148,6 @@ def updateLcd():
     lcd_henok.lcd_clear_line(1)
     time.sleep(1.0/1000.0)
     lcd_henok.lcd_display(getProductName(last_inp), 1, 0)
-    #lcd_henok.lcd_clear_line(2)
     time.sleep(1.0/10000.0)
     global total
     global return_item_t
@@ -224,7 +235,47 @@ def payment(cardInfo):
     lcd_henok.lcd_display('  Completed!', 2, 0)
     lcd_henok.lcd_display('   Thank You!', 3, 0)
     lcd_henok.lcd_display('---COME AGAIN---', 4, 0)
+    print_bill()
+    time.sleep(10)
+    lcd_henok.clear_all()
+    reset()
     print(card_num)
+
+# Generates a space b/n name, Qty and Price.
+def space_btween(i):
+    len_name_qty = 19 - len(items_purchased[i])
+    len_qty_price = 6 - len(str(items_purchased_quantity[i]))
+    len_grand_tot = 14 - len(str(total))
+    spaceNameQty = ''
+    spaceQtyPrice = ''
+    spaceGrandTot = ''
+    for j in range(len_name_qty):
+        spaceNameQty += '.'
+
+    for j in range(len_qty_price):
+        spaceQtyPrice += '.'
+    for j in range(len_grand_tot):
+        spaceGrandTot += ' '
+    
+    return(spaceNameQty, spaceQtyPrice, spaceGrandTot)
+
+# Prints a paper bill for the user
+def print_bill():
+    formated_bill = ''
+    formated_bill += 'Name               Qty.  Price\n\n'
+    for i in range(len(items_purchased)):
+        formated_bill += items_purchased[i] + space_btween(i)[0] + str(items_purchased_quantity[i]) + space_btween(i)[1] + getProductPrice(items_purchased[i]) + '\n'
+
+    formated_bill += '\n' + space_btween(0)[2] + 'Grand Total : ' + str(total)
+    print(formated_bill)
+    
+    printer.setSize('S')
+    printer.println(formated_bill)
+    printer.println("")
+    printer.println("")
+    printer.println("")
+    printer.println("")
+    
     
 def returnKey(e):        
     global return_item
@@ -247,17 +298,13 @@ def returnKey(e):
             return_item_t = False
         else:
             itemPurchased()
-            print(items_purchased)
-            print(items_purchased_quantity)
             updateLcd()
-    
+
+GPIO.add_event_detect(buttonPin, GPIO.FALLING, callback=buttonPressCallback, bouncetime=300)     
 root = Tk()
 root.title("Command Center")
-buttonThread = threading.Thread(target=executeButtonThread)
-
     
 root.bind("<KeyPress>", keydown)
 root.bind("<Return>", returnKey)
-buttonThread.start()
 mainloop()
 root.mainloop()
